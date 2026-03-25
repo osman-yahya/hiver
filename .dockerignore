@@ -1,0 +1,11 @@
+node_modules/
+.git/
+agent/
+*.db
+data/
+__pycache__/
+*.pyc
+.env
+ui/dist/
+ui/temp_vite/
+mother/ui/

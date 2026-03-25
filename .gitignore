@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+.venv/
+env/
+.env
+*.db
+data/
+
+# Node / React
+ui/node_modules/
+ui/dist/
+ui/temp_vite/
+ui/.vite/
+
+# Go
+agent/vendor/
+agent/*.exe
+agent/hiver-agent
+
+# Redis & Logs
+*.log
+dump.rdb
+appendonly.aof
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

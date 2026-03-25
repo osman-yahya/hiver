@@ -1,0 +1,38 @@
+services:
+  hiver-redis:
+    image: redis:7-alpine
+    container_name: hiver-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  hiver-mother:
+    build:
+      context: .                        # project root — gives Docker access to ui/ and mother/
+      dockerfile: mother/Dockerfile
+    container_name: hiver-mother
+    restart: unless-stopped
+    ports:
+      - "${HIVER_PORT:-8000}:8000"
+    environment:
+      - HIVER_SECRET_KEY=${HIVER_SECRET_KEY:-changeme_please_use_a_long_secret}
+      - HIVER_ADMIN_USER=${HIVER_ADMIN_USER:-admin}
+      - HIVER_ADMIN_PASSWORD=${HIVER_ADMIN_PASSWORD:-changeme}
+      - HIVER_DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/hiver.db}
+      - HIVER_REDIS_URL=${REDIS_URL:-redis://hiver-redis:6379/0}
+      - HIVER_HOST=0.0.0.0
+      - HIVER_PORT=8000
+    volumes:
+      - hiver_db:/app/data
+    depends_on:
+      hiver-redis:
+        condition: service_healthy
+
+volumes:
+  redis_data:
+  hiver_db:
