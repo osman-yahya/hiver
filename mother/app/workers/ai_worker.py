@@ -6,7 +6,8 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from ..database import AsyncSessionLocal
-from ..models.db import ErrorLog, GlobalSettings
+from ..models.db import ErrorLog, GlobalSettings, Alert
+from datetime import datetime
 
 logger = logging.getLogger("hiver.ai_worker")
 
@@ -53,6 +54,27 @@ async def process_log(redis: Redis, log_id: int):
             except Exception as e:
                 logger.warning(f"Ollama failed for log {log_id}: {e} — falling back to raw log")
                 log_entry.ai_explanation = None
+
+        # Create Alert if none is active for this container
+        alert_title = f"Container Error: {log_entry.container_name}"
+        active_alert = (await db.execute(
+            select(Alert).where(
+                Alert.server_id == log_entry.server_id,
+                Alert.title == alert_title,
+                Alert.is_acknowledged == False
+            )
+        )).scalar_one_or_none()
+
+        if not active_alert:
+            alert_msg = log_entry.ai_explanation if log_entry.ai_explanation else log_entry.raw_log[:200]
+            new_alert = Alert(
+                server_id=log_entry.server_id,
+                title=alert_title,
+                message=alert_msg,
+                severity="error",
+                fired_at=datetime.utcnow()
+            )
+            db.add(new_alert)
 
         log_entry.ai_processed = True
         await db.commit()

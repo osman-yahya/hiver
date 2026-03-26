@@ -16,6 +16,14 @@ export default function KioskPage() {
   const [autoRotate, setAutoRotate] = useLocalStorage('hiver_kiosk_autoRotate', false)
   const [rotateSpeed, setRotateSpeed] = useLocalStorage('hiver_kiosk_rotateSpeed', 60)
   const [activeViews, setActiveViews] = useLocalStorage('hiver_kiosk_activeViews', ['grid', 'mixed', 'carousel', 'logs', 'sidebar', 'dynamic', 'control'])
+  const [themeName, setThemeName] = useLocalStorage('hiver_kiosk_theme', 'default')
+
+  const THEMES = {
+    default: {},
+    cyberpunk: { '--bg-base': '#050510', '--bg-surface': '#111122', '--border': '#e94560', '--accent': '#f9a826', '--text': '#fff', '--text-muted': '#f39c12', '--green': '#00ffcc', '--red': '#ff0055', '--blue': '#00d2ff', '--orange': '#ff9900' },
+    matrix: { '--bg-base': '#000000', '--bg-surface': '#030a03', '--border': '#003300', '--accent': '#00ff00', '--text': '#00ff00', '--text-muted': '#008800', '--green': '#00ff00', '--red': '#00ff00', '--blue': '#00ff00', '--orange': '#00ff00' },
+    midnight: { '--bg-base': '#10002b', '--bg-surface': '#240046', '--border': '#3c096c', '--accent': '#e0aaff', '--text': '#fff', '--text-muted': '#c77dff', '--green': '#ff9e00', '--red': '#ff0a54', '--blue': '#4cc9f0', '--orange': '#ff6d00' }
+  }
 
   useEffect(() => {
     if (!autoRotate || activeViews.length === 0) return
@@ -39,7 +47,7 @@ export default function KioskPage() {
   }, [])
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', padding: 0, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ ...THEMES[themeName], height: '100vh', overflow: 'hidden', background: 'var(--bg-base)', padding: 0, display: 'flex', flexDirection: 'column' }}>
       <div style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent)', textShadow: '0 0 10px rgba(100,200,255,0.6)' }}>🐝 HIVER COMMAND CENTER</span>
@@ -84,8 +92,10 @@ export default function KioskPage() {
               <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>No active alerts.<br/>All systems nominal.</div>
             ) : (
               alerts.map(a => (
-                <div key={a.id} style={{ background: 'rgba(255, 60, 60, 0.1)', borderLeft: `4px solid ${a.severity==='critical'?'#ff4444':'#ffaa00'}`, padding: 12, borderRadius: 4 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 4, color: '#fff' }}>{a.title}</div>
+                <div key={a.id} style={{ background: 'rgba(255, 60, 60, 0.1)', borderLeft: `4px solid ${a.severity==='critical'?'#ff4444':'#ffaa00'}`, padding: 12, borderRadius: 4, opacity: a.is_acknowledged ? 0.4 : 1, filter: a.is_acknowledged ? 'grayscale(1)' : 'none' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4, color: '#fff' }}>
+                    {a.title} {a.is_acknowledged && <span style={{fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-muted)'}}>(Ack)</span>}
+                  </div>
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>{a.message}</div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 8 }}>{new Date(a.fired_at).toLocaleTimeString()}</div>
                 </div>
@@ -104,6 +114,16 @@ export default function KioskPage() {
             <div className="field-row">
               <label className="field-label">Carousel Rotation Speed (sec)</label>
               <input type="number" className="input" value={carouselSpeed} onChange={e => setCarouselSpeed(Number(e.target.value))} />
+            </div>
+
+            <div className="field-row">
+              <label className="field-label">Kiosk Theme</label>
+              <select className="input" value={themeName} onChange={e => setThemeName(e.target.value)}>
+                <option value="default">Default Blue</option>
+                <option value="cyberpunk">Cyberpunk Neon</option>
+                <option value="matrix">Matrix Green</option>
+                <option value="midnight">Midnight Purple</option>
+              </select>
             </div>
 
             <div className="field-row" style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
@@ -183,8 +203,8 @@ function KioskGridView({ servers }) {
 
             <div className="metric-row">
               <div className="metric-label-row">
-                <span>CPU</span>
-                <span style={{ color: getC(s.cpu_percent) }}>{s.cpu_percent?.toFixed(1) ?? '—'}%</span>
+                <span>CPU {typeof s.temperature_c === 'number' ? `(${Math.round(s.temperature_c)}°C)` : ''}</span>
+                <span style={{ color: getC(s.cpu_percent) }}>{typeof s.cpu_percent === 'number' ? s.cpu_percent.toFixed(1) : '—'}%</span>
               </div>
               <div className="metric-bar-track"><div className="metric-bar-fill" style={{ width: `${Math.min(100, s.cpu_percent || 0)}%`, background: getC(s.cpu_percent) }} /></div>
             </div>
@@ -348,9 +368,10 @@ function KioskLogsView({ alerts }) {
               <div style={{ color: a.severity === 'critical' ? '#ff4444' : '#ffaa00', minWidth: 100 }}>
                 [{new Date(a.fired_at).toLocaleTimeString()}]
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, textDecoration: a.is_acknowledged ? 'line-through' : 'none', opacity: a.is_acknowledged ? 0.5 : 1 }}>
                 <span style={{ color: '#fff', fontWeight: 'bold' }}>{a.title}</span>
                 <span style={{ color: '#aaa', marginLeft: 12 }}>— {a.message}</span>
+                {a.is_acknowledged && <span style={{ color: '#888', fontStyle: 'italic', marginLeft: 12 }}>(Acknowledged)</span>}
               </div>
             </div>
           ))
@@ -398,7 +419,7 @@ function KioskSidebarGraphView({ servers, carouselSpeed }) {
                 <div style={{ fontSize: '0.8rem', color: isActive ? 'var(--accent)' : 'var(--text-muted)' }}>{statusLabel[s.status]}</div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-                <span>CPU: <span style={{ color: getC(s.cpu_percent) }}>{s.cpu_percent?.toFixed(1) ?? '—'}%</span></span>
+                <span>CPU: <span style={{ color: getC(s.cpu_percent) }}>{typeof s.cpu_percent === 'number' ? s.cpu_percent.toFixed(1) : '—'}% {typeof s.temperature_c === 'number' ? `(${Math.round(s.temperature_c)}°C)` : ''}</span></span>
                 <span>RAM: <span style={{ color: getC(s.mem_total_mb ? Math.round(s.mem_used_mb / s.mem_total_mb * 100) : 0) }}>{s.mem_total_mb ? Math.round(s.mem_used_mb / s.mem_total_mb * 100) : 0}%</span></span>
               </div>
             </div>
@@ -444,8 +465,8 @@ function KioskDynamicCardsView({ servers, carouselSpeed }) {
 
               <div className="metric-row">
                 <div className="metric-label-row">
-                  <span>CPU</span>
-                  <span style={{ color: getC(s.cpu_percent), fontSize: isCritical ? '1.5rem' : '1rem' }}>{s.cpu_percent?.toFixed(1) ?? '—'}%</span>
+                  <span>CPU {typeof s.temperature_c === 'number' ? `(${Math.round(s.temperature_c)}°C)` : ''}</span>
+                  <span style={{ color: getC(s.cpu_percent), fontSize: isCritical ? '1.5rem' : '1rem' }}>{typeof s.cpu_percent === 'number' ? s.cpu_percent.toFixed(1) : '—'}%</span>
                 </div>
                 <div className="metric-bar-track" style={{ height: isCritical ? 12 : 8 }}><div className="metric-bar-fill" style={{ width: `${Math.min(100, s.cpu_percent || 0)}%`, background: getC(s.cpu_percent) }} /></div>
               </div>

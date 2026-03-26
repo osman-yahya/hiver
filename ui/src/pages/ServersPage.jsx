@@ -12,6 +12,10 @@ export default function ServersPage() {
   const [agentToken, setAgentToken] = useState('')
   const [addOpen, setAddOpen] = useState(false)
 
+  const [editServer, setEditServer] = useState(null)
+  const [editLabel, setEditLabel] = useState('')
+  const [editGroup, setEditGroup] = useState('')
+
   useEffect(() => { fetchServers() }, [])
 
   const generateCmd = (label, type, token, port) => {
@@ -73,9 +77,23 @@ export default function ServersPage() {
   }
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Remove this server?')) return
-    await api.delete(`/servers/${id}`)
+    if (!confirm('Remove this server globally?')) return
+    await api.delete(`/servers/${id}`).catch(console.error)
     fetchServers()
+  }
+
+  const handleEditSave = async () => {
+    if (!editLabel.trim()) return alert("Label cannot be empty")
+    try {
+      await api.patch(`/servers/${editServer.id}`, {
+        label: editLabel.trim(),
+        group_name: editGroup.trim() || null
+      })
+      setEditServer(null)
+      fetchServers()
+    } catch (err) {
+      alert("Failed to update server: " + (err.response?.data?.detail || err.message))
+    }
   }
 
   return (
@@ -159,11 +177,20 @@ export default function ServersPage() {
                   </td>
                   <td className="text-xs text-muted">{s.group_name || '—'}</td>
                   <td><span className={`status-badge ${s.status}`}><span className="status-dot" />{s.status}</span></td>
-                  <td>{s.cpu_percent?.toFixed(1) ?? '—'}%</td>
+                  <td>
+                      <span style={{ color: getC(s.cpu_percent) }}>{typeof s.cpu_percent === 'number' ? s.cpu_percent.toFixed(1) : '—'}% {typeof s.temperature_c === 'number' ? `(${Math.round(s.temperature_c)}°C)` : ''}</span>
+                  </td>
                   <td>{s.mem_total_mb ? `${Math.round(s.mem_used_mb / s.mem_total_mb * 100)}%` : '—'}</td>
                   <td className="text-xs text-muted">{s.last_seen ? new Date(s.last_seen).toLocaleString() : '—'}</td>
                   <td>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(s.id)}>Remove</button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => {
+                        setEditServer(s)
+                        setEditLabel(s.label)
+                        setEditGroup(s.group_name || '')
+                      }}>✏️ Edit</button>
+                      <button className="btn btn-danger btn-sm" onClick={() => handleDelete(s.id)}>Remove</button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -171,6 +198,33 @@ export default function ServersPage() {
           </table>
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {editServer && (
+        <div className="modal-backdrop" onClick={() => setEditServer(null)}>
+          <div className="card" style={{ width: 400 }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ marginBottom: 16 }}>Edit Server</h3>
+            <div className="field-row">
+              <label className="field-label">Server Label *</label>
+              <input className="input" value={editLabel} onChange={e => setEditLabel(e.target.value)} />
+            </div>
+            <div className="field-row">
+              <label className="field-label">Group Name (Optional)</label>
+              <input className="input" placeholder="e.g. production, database" value={editGroup} onChange={e => setEditGroup(e.target.value)} />
+            </div>
+            <div className="flex justify-end mt-4">
+              <button className="btn btn-primary" onClick={handleEditSave}>Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+function getC(pct) {
+  if (!pct) return 'inherit'
+  if (pct < 60) return 'var(--green)'
+  if (pct < 85) return 'var(--orange)'
+  return 'var(--red)'
 }

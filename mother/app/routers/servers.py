@@ -73,8 +73,28 @@ async def list_servers(db: AsyncSession = Depends(get_db), _: User = Depends(get
             "mem_used_mb": snap.mem_used_mb if snap else None,
             "mem_total_mb": snap.mem_total_mb if snap else None,
             "disk_percent": snap.disk_percent if snap else None,
+            "temperature_c": snap.temperature_c if snap else None,
         })
     return out
+
+class ServerUpdate(BaseModel):
+    label: Optional[str] = None
+    group_name: Optional[str] = None
+
+@router.patch("/{server_id}")
+async def update_server(server_id: str, body: ServerUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+    result = await db.execute(select(Server).where(Server.id == server_id))
+    server = result.scalar_one_or_none()
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+    
+    if body.label is not None:
+        server.label = body.label.strip()
+    if body.group_name is not None:
+        server.group_name = body.group_name.strip()
+        
+    await db.commit()
+    return {"ok": True, "id": server.id, "label": server.label, "group_name": server.group_name}
 
 
 @router.get("/{server_id}")

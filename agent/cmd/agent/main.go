@@ -116,6 +116,7 @@ type MetricsPayload struct {
 	Load5      float64         `json:"load_5"`
 	Load15     float64         `json:"load_15"`
 	UptimeSecs uint64          `json:"uptime_secs"`
+	TemperatureC float64       `json:"temperature_c"`
 	Containers []ContainerInfo `json:"containers"`
 	ErrorLogs  []ErrorLog      `json:"error_logs"`
 }
@@ -218,6 +219,15 @@ func (a *Agent) collect() (*MetricsPayload, error) {
 	// Uptime
 	uptime, _ := host.Uptime()
 
+	// Temperature (CPU)
+	tempStat, _ := host.SensorsTemperatures()
+	var maxTemp float64
+	for _, t := range tempStat {
+		if t.Temperature > maxTemp && !strings.Contains(strings.ToLower(t.SensorKey), "pch") { // Filter out non-cpu logic boards if possible or just take max
+			maxTemp = t.Temperature
+		}
+	}
+
 	// Containers
 	containers, errLogs, _ := a.collectDocker(ctx)
 	if containers == nil {
@@ -244,6 +254,7 @@ func (a *Agent) collect() (*MetricsPayload, error) {
 		Load5:      loadStat.Load5,
 		Load15:     loadStat.Load15,
 		UptimeSecs: uptime,
+		TemperatureC: maxTemp,
 		Containers: containers,
 		ErrorLogs:  errLogs,
 	}, nil

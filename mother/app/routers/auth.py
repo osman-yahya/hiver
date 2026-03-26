@@ -48,3 +48,16 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
 @router.get("/me")
 async def me(current_user: User = Depends(get_current_user)):
     return {"id": current_user.id, "username": current_user.username, "role": current_user.role}
+
+class ChangePasswordBody(BaseModel):
+    old_password: str
+    new_password: str
+
+@router.post("/change-password")
+async def change_password(body: ChangePasswordBody, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    from ..auth import verify_password, hash_password
+    if not verify_password(body.old_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect old password")
+    current_user.hashed_password = hash_password(body.new_password)
+    await db.commit()
+    return {"ok": True}

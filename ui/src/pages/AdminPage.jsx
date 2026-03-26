@@ -9,6 +9,11 @@ export default function AdminPage() {
   const [testResult, setTestResult] = useState(null)
   const [testing, setTesting] = useState(false)
   const [users, setUsers] = useState([])
+  const [newUserOpen, setNewUserOpen] = useState(false)
+  const [newU, setNewU] = useState({ username: '', password: '', role: 'operator' })
+  
+  const [changePwOpen, setChangePwOpen] = useState(false)
+  const [pw, setPw] = useState({ old_password: '', new_password: '' })
 
   useEffect(() => { fetchSettings(); fetchUsers() }, [])
   useEffect(() => { setLocalSettings(settings) }, [settings])
@@ -38,9 +43,42 @@ export default function AdminPage() {
     }
   }
 
+  const handleAddUser = async () => {
+    if (!newU.username || !newU.password) return alert("Required fields missing")
+    try {
+      await api.post('/admin/users', newU)
+      setNewUserOpen(false)
+      setNewU({ username: '', password: '', role: 'operator' })
+      fetchUsers()
+    } catch (e) { alert(e.response?.data?.detail || e.message) }
+  }
+
+  const handleDeleteUser = async (id) => {
+    if (!confirm("Delete user?")) return
+    try {
+      await api.delete(`/admin/users/${id}`)
+      fetchUsers()
+    } catch (e) { alert(e.response?.data?.detail || e.message) }
+  }
+
+  const handleChangePassword = async () => {
+    if (!pw.old_password || !pw.new_password) return alert("Missing fields")
+    try {
+      await api.post('/auth/change-password', pw)
+      alert("Password changed successfully!")
+      setChangePwOpen(false)
+      setPw({ old_password: '', new_password: '' })
+    } catch (e) { alert(e.response?.data?.detail || e.message) }
+  }
+
   return (
     <div className="page-content" style={{ maxWidth: 720 }}>
-      <h1 style={{ marginBottom: 24 }}>Administration</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <h1 style={{ margin: 0 }}>Administration</h1>
+        <button className="btn btn-ghost" onClick={() => setChangePwOpen(true)} style={{ border: '1px solid var(--border)' }}>
+          🔐 Change My Password
+        </button>
+      </div>
 
       {/* ── AI Engine ────────────────── */}
       <div className="settings-section">
@@ -143,11 +181,14 @@ export default function AdminPage() {
 
       {/* ── Users ────────────────── */}
       <div className="settings-section" style={{ marginTop: 40 }}>
-        <h3>👥 Users</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ margin: 0 }}>👥 Users</h3>
+          <button className="btn btn-primary btn-sm" onClick={() => setNewUserOpen(true)}>+ Add User</button>
+        </div>
         <div className="card">
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Username</th><th>Role</th><th>Active</th><th>Created</th></tr></thead>
+              <thead><tr><th>Username</th><th>Role</th><th>Active</th><th>Created</th><th>Actions</th></tr></thead>
               <tbody>
                 {users.map(u => (
                   <tr key={u.id}>
@@ -155,6 +196,9 @@ export default function AdminPage() {
                     <td><span className="chip" style={roleStyle(u.role)}>{u.role}</span></td>
                     <td>{u.is_active ? '✓' : '—'}</td>
                     <td className="text-xs text-muted">{new Date(u.created_at).toLocaleDateString()}</td>
+                    <td>
+                      <button className="btn btn-danger btn-sm" onClick={() => handleDeleteUser(u.id)}>Delete</button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -162,6 +206,53 @@ export default function AdminPage() {
           </div>
         </div>
       </div>
+
+      {newUserOpen && (
+        <div className="modal-backdrop" onClick={() => setNewUserOpen(false)}>
+          <div className="card" style={{ width: 400 }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ marginBottom: 16 }}>Create New User</h3>
+            <div className="field-row">
+              <label className="field-label">Username</label>
+              <input className="input" value={newU.username} onChange={e => setNewU({...newU, username: e.target.value})} />
+            </div>
+            <div className="field-row">
+              <label className="field-label">Password</label>
+              <input className="input" type="password" value={newU.password} onChange={e => setNewU({...newU, password: e.target.value})} />
+            </div>
+            <div className="field-row">
+              <label className="field-label">Role</label>
+              <select className="input" value={newU.role} onChange={e => setNewU({...newU, role: e.target.value})}>
+                <option value="admin">Admin</option>
+                <option value="operator">Operator</option>
+                <option value="kiosk">Kiosk Only</option>
+              </select>
+            </div>
+            <div className="flex justify-end mt-4">
+              <button className="btn btn-primary" onClick={handleAddUser}>Create User</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {changePwOpen && (
+        <div className="modal-backdrop" onClick={() => setChangePwOpen(false)}>
+          <div className="card" style={{ width: 400 }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ marginBottom: 16 }}>Change Password</h3>
+            <div className="field-row">
+              <label className="field-label">Current Password</label>
+              <input className="input" type="password" value={pw.old_password} onChange={e => setPw({...pw, old_password: e.target.value})} />
+            </div>
+            <div className="field-row">
+              <label className="field-label">New Password</label>
+              <input className="input" type="password" value={pw.new_password} onChange={e => setPw({...pw, new_password: e.target.value})} />
+            </div>
+            <div className="flex justify-end mt-4">
+              <button className="btn btn-primary" onClick={handleChangePassword}>Update Password</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

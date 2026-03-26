@@ -50,7 +50,9 @@ class MetricsPayload(BaseModel):
     load_1: float
     load_5: float
     load_15: float
+    load_15: float
     uptime_secs: int
+    temperature_c: float = 0.0
     containers: List[ContainerPayload] = []
     error_logs: List[ErrorLogPayload] = []
 
@@ -86,8 +88,11 @@ async def process_metrics_payload(server: Server, body: MetricsPayload, db: Asyn
         load_5=body.load_5,
         load_15=body.load_15,
         uptime_secs=body.uptime_secs,
+        temperature_c=body.temperature_c,
     )
     db.add(snapshot)
+    
+    server.temperature_c = body.temperature_c
 
     # Update containers (replace all for this server)
     await db.execute(delete(ContainerRecord).where(ContainerRecord.server_id == server.id))
@@ -133,6 +138,7 @@ async def process_metrics_payload(server: Server, body: MetricsPayload, db: Asyn
         "mem_used_mb": body.mem_used_mb,
         "mem_total_mb": body.mem_total_mb,
         "disk_percent": body.disk_percent,
+        "temperature_c": body.temperature_c,
         "status": "online",
     })
 

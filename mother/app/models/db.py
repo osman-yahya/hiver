@@ -48,10 +48,12 @@ class Server(Base):
     group_name = Column(String, nullable=True, index=True)
     tags = Column(Text, default="")          # comma-separated
     connection_type = Column(Enum(ConnectionType), default=ConnectionType.push)
+    connection_type = Column(Enum(ConnectionType), default=ConnectionType.push)
     agent_url = Column(String, nullable=True) # e.g. http://10.0.0.5:8080
     last_seen = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     missed_heartbeats = Column(Integer, default=0)
+    temperature_c = Column(Float, nullable=True)
 
     metrics = relationship("MetricSnapshot", back_populates="server", cascade="all, delete-orphan")
     containers = relationship("ContainerRecord", back_populates="server", cascade="all, delete-orphan")
@@ -75,6 +77,7 @@ class MetricSnapshot(Base):
     load_5 = Column(Float)
     load_15 = Column(Float)
     uptime_secs = Column(BigInteger)
+    temperature_c = Column(Float, nullable=True)
 
     server = relationship("Server", back_populates="metrics")
 
