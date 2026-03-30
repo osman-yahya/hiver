@@ -437,17 +437,25 @@ func main() {
 
 	cfg := loadConfig()
 	agent := newAgent(cfg)
-	
-	if cfg.MotherURL != "" {
-		agent.register()
-		go agent.run()
-	} else if cfg.AgentToken == "" {
-		log.Fatalf("[hiver-agent] AGENT_TOKEN must be provided (via env) if MOTHER_URL is empty for Pull mode")
-	}
 
-	http.HandleFunc("/metrics", agent.serveMetrics)
-	log.Printf("[hiver-agent] listening for pull requests on :%s", cfg.AgentPort)
-	if err := http.ListenAndServe(":"+cfg.AgentPort, nil); err != nil {
-		log.Fatalf("[hiver-agent] http server error: %v", err)
+	if cfg.MotherURL != "" {
+		// ── PUSH MODE ────────────────────────────────────────────────
+		// Register, then continuously push metrics to Mother on a ticker.
+		// We do NOT start the HTTP listener in push mode.
+		log.Printf("[hiver-agent] push mode — pushing to %s", cfg.MotherURL)
+		agent.register()
+		agent.run() // blocks forever
+	} else {
+		// ── PULL MODE ────────────────────────────────────────────────
+		// Mother will reach out to us. Expose /metrics over HTTP.
+		// AGENT_TOKEN must be provided via env for auth.
+		if cfg.AgentToken == "" {
+			log.Fatalf("[hiver-agent] AGENT_TOKEN must be set when MOTHER_URL is empty (pull mode)")
+		}
+		http.HandleFunc("/metrics", agent.serveMetrics)
+		log.Printf("[hiver-agent] pull mode — listening for requests on :%s", cfg.AgentPort)
+		if err := http.ListenAndServe(":"+cfg.AgentPort, nil); err != nil {
+			log.Fatalf("[hiver-agent] http server error: %v", err)
+		}
 	}
 }

@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete as sa_delete
 from typing import Optional, List
 from pydantic import BaseModel
 from ..database import get_db
-from ..models.db import Server, MetricSnapshot, ContainerRecord
+from ..models.db import Server, MetricSnapshot, ContainerRecord, ErrorLog, Alert
 from .auth import get_current_user
 from ..models.db import User
 from ..models.db import User, ConnectionType
@@ -182,33 +182,17 @@ async def get_server_history(
     ]
 
 
-@router.patch("/{server_id}")
-async def update_server(
-    server_id: str,
-    body: dict,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
-):
-    result = await db.execute(select(Server).where(Server.id == server_id))
-    server = result.scalar_one_or_none()
-    if not server:
-        raise HTTPException(status_code=404, detail="Server not found")
-    if "label" in body:
-        server.label = body["label"]
-    if "group_name" in body:
-        server.group_name = body["group_name"]
-    if "tags" in body:
-        server.tags = ",".join(body["tags"]) if isinstance(body["tags"], list) else body["tags"]
-    await db.commit()
-    return {"ok": True}
-
-
 @router.delete("/{server_id}")
 async def delete_server(server_id: str, db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
     result = await db.execute(select(Server).where(Server.id == server_id))
     server = result.scalar_one_or_none()
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
+    # Cascade-delete all child records first to avoid FK constraint errors
+    await db.execute(sa_delete(Alert).where(Alert.server_id == server_id))
+    await db.execute(sa_delete(ErrorLog).where(ErrorLog.server_id == server_id))
+    await db.execute(sa_delete(ContainerRecord).where(ContainerRecord.server_id == server_id))
+    await db.execute(sa_delete(MetricSnapshot).where(MetricSnapshot.server_id == server_id))
     await db.delete(server)
     await db.commit()
     return {"ok": True}
